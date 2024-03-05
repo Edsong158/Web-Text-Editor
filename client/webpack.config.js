@@ -3,6 +3,7 @@ const WebpackPwaManifest = require('webpack-pwa-manifest');
 const path = require('path');
 const { InjectManifest } = require('workbox-webpack-plugin');
 
+
 module.exports = () => {
   return {
     mode: 'development',
@@ -16,29 +17,35 @@ module.exports = () => {
     },
     plugins: [
       new HtmlWebpackPlugin({
-        template: './src/index.html',
+        template: './index.html',
         filename: 'index.html',
+        // chunks: ['main'],
       }),
       new WebpackPwaManifest({
-        name: 'Your PWA Name',
-        short_name: 'PWA Name',
-        description: 'Description of your PWA',
+        fingerprints: false,
+        inject: true,
+        // filename: 'manifest.json',
+        name: 'Just Another Text Editor',
+        short_name: 'JATE',
+        description: 'Another Text Editor',
         background_color: '#ffffff',
         theme_color: '#31a9e1',
         start_url: '/',
+        publicPath: '/',
         icons: [
           {
-            src: path.resolve('src/assets/icon.png'),
+            src: path.resolve('./src/images/logo.png'),
             sizes: [96, 128, 192, 256, 384, 512],
             destination: path.join('assets', 'icons'),
           },
         ],
       }),
       new InjectManifest({
-        swSrc: './src/sw.js',
+        swSrc: './src-sw.js', // Path to your service worker source file
+        swDest: 'src-sw.js', // Output service worker file name
+        exclude: [/\.map$/, /manifest\.json$/, /install\.html$/],
       }),
     ],
-
     module: {
       rules: [
         {
@@ -52,10 +59,19 @@ module.exports = () => {
             loader: 'babel-loader',
             options: {
               presets: ['@babel/preset-env'],
+              plugins: ['@babel/plugin-proposal-object-rest-spread', '@babel/transform-runtime'],
             },
           },
         },
       ],
+    },
+    devServer: {
+      static: {
+        directory: path.join(__dirname, './dist'),
+      },
+      compress: true,
+      port: 8080,
+      watchFiles: ['./src/**/*']
     },
   };
 };

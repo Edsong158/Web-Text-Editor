@@ -1,30 +1,59 @@
-const { offlineFallback, warmStrategyCache } = require('workbox-recipes');
-const { CacheFirst } = require('workbox-strategies');
-const { registerRoute } = require('workbox-routing');
-const { CacheableResponsePlugin } = require('workbox-cacheable-response');
-const { ExpirationPlugin } = require('workbox-expiration');
-const { precacheAndRoute } = require('workbox-precaching/precacheAndRoute');
+import { CacheFirst, NetworkFirst } from 'workbox-strategies';
+import { precacheAndRoute } from 'workbox-precaching';
+import { registerRoute } from 'workbox-routing';
+import { CacheableResponsePlugin } from 'workbox-cacheable-response';
+import { ExpirationPlugin } from 'workbox-expiration';
 
+// Precache and route all static assets
 precacheAndRoute(self.__WB_MANIFEST);
 
-const pageCache = new CacheFirst({
+// Cache page navigation requests
+const pageCache = new NetworkFirst({
   cacheName: 'page-cache',
   plugins: [
     new CacheableResponsePlugin({
-      statuses: [0, 200],
-    }),
-    new ExpirationPlugin({
-      maxAgeSeconds: 30 * 24 * 60 * 60,
+      statuses: [200],
     }),
   ],
 });
 
-warmStrategyCache({
-  urls: ['/index.html', '/'],
-  strategy: pageCache,
+registerRoute(
+  ({ request }) => request.mode === 'navigate',
+  ({ event }) => pageCache.handle({ event })
+);
+
+// Cache API responses
+const apiCache = new CacheFirst({
+  cacheName: 'api-cache',
+  plugins: [
+    new CacheableResponsePlugin({
+      statuses: [200],
+    }),
+    new ExpirationPlugin({
+      maxAgeSeconds: 60 * 60, // Cache for 1 hour
+    }),
+  ],
 });
 
-registerRoute(({ request }) => request.mode === 'navigate', pageCache);
+// Match requests to specific APIs and use the API cache strategy
+registerRoute(
+  ({ url }) => url.pathname.startsWith('/api/'),
+  ({ event }) => apiCache.handle({ event })
+);
 
-// TODO: Implement asset caching
-registerRoute();
+// Cache other assets with a CacheFirst strategy
+registerRoute(
+  /\.(?:js|css|png|jpg|jpeg|svg|gif)$/,
+  new CacheFirst({
+    cacheName: 'static-assets-cache',
+    plugins: [
+      new CacheableResponsePlugin({
+        statuses: [0, 200],
+      }),
+      new ExpirationPlugin({
+        maxEntries: 100, // Cache up to 100 entries
+        maxAgeSeconds: 7 * 24 * 60 * 60, // Cache for 7 days
+      }),
+    ],
+  })
+);
